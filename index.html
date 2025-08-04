@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora Bitcoin | Vem Pra Dig</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(rgb(0, 61, 122),#000620);
+            color: #000000;
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .calculator-container {
+            background-color: rgba(0, 17, 54, 0.95);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 600px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgb(15, 183, 255);
+        }
+        h1 {
+            color: #ffffff;
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #15ccff;
+            font-size: 14px;
+        }
+        /* Placeholder do input de taxa */
+        #fee::placeholder {
+            color: #9c0000;
+            font-size: 14px; /* Opcional: ajuste o tamanho se necessário */
+        }
+
+        /* Compatibilidade com navegadores */
+        #amount::-webkit-input-placeholder,
+        #fee::-webkit-input-placeholder { /* Chrome/Edge/Safari */
+            color: #c5c5c5;
+        }
+        #amount::-moz-placeholder,
+        #fee::-moz-placeholder { /* Firefox */
+            color: #e3e3e3;
+            opacity: 1;
+        }
+        input, select {
+            width: 100%;
+            color: #c5c5c5;
+            padding: 14px 16px;
+            border: 1px solid #184865;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            background-color: #003d7a;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #0066ff;
+            box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.2);
+        }
+        button {
+            width: 100%;
+            padding: 16px;
+            background-color: #0066ff;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+        }
+        button:hover {
+            background-color: #0052cc;
+            transform: translateY(-2px);
+        }
+        .result-container {
+            margin-top: 30px;
+            padding: 25px;
+            background-color: #f5f8ffe6;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #f5f8ffe6;
+        }
+        .result-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0066ff;
+            margin: 15px 0;
+        }
+        .result-label {
+            font-size: 16px;
+            color: #666;
+            font-weight: 500;
+        }
+        .info-text {
+            font-size: 13px;
+            color: #0066ff;
+            margin-top: 8px;
+            text-align: right;
+        }
+        .error-message {
+            color: #fb4c4c;
+            font-size: 14px;
+            margin-top: 15px;
+            padding: 12px;
+            background-color: rgba(255, 107, 107, 0.28);
+            border-radius: 8px;
+            display: none;
+            text-align: center;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+        .currency-selectors {
+            display: flex;
+            gap: 15px;
+        }
+        .currency-selectors > div {
+            flex: 1;
+        }
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
+            }
+            .calculator-container {
+                padding: 20px;
+            }
+            .currency-selectors {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator-container">
+        <h1>Calculadora Bitcoin</h1>
+        
+        <div class="form-group">
+            <label for="amount">Valor</label>
+            <input type="number" id="amount" placeholder="Digite o valor" step="any" min="0">
+        </div>
+        
+        <div class="currency-selectors">
+            <div class="form-group">
+                <label for="input-currency">De</label>
+                <select id="input-currency">
+                    <option value="BRL">BRL (Real Brasileiro)</option>
+                    <option value="USD">USD (Dólar Americano)</option>
+                    <option value="EUR">EUR (Euro)</option>
+                    <option value="BTC">BTC (Bitcoin)</option>
+                    <option value="sats">Sats</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="output-currency">Para</label>
+                <select id="output-currency">
+                    <option value="BTC">BTC (Bitcoin)</option>
+                    <option value="sats">Sats</option>
+                    <option value="BRL">BRL (Real Brasileiro)</option>
+                    <option value="USD">USD (Dólar Americano)</option>
+                    <option value="EUR">EUR (Euro)</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="fee">Taxa (%)</label>
+            <input type="number" id="fee" placeholder="Ex.: 5 para +5%, -5 para -5%" step="any">
+            <div class="info-text">Opcional - aplicada ao valor final</div>
+        </div>
+        
+        <button onclick="calculate()">Calcular</button>
+        
+        <div id="error" class="error-message"></div>
+        
+        <div class="result-container" id="result" style="display: none;">
+            <div class="result-label">Resultado</div>
+            <div class="result-value" id="result-value"></div>
+            <div class="info-text" id="last-updated"></div>
+        </div>
+    </div>
+
+    <script>
+        // (O código JavaScript permanece exatamente o mesmo da versão anterior)
+        let btcPrices = {};
+        const COINGECKO_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=';
+        const UPDATE_INTERVAL = 60000; // 60 segundos
+
+        async function fetchBtcPrice(currency, retries = 3) {
+            try {
+                const response = await fetch(`${COINGECKO_URL}${currency.toLowerCase()}`);
+                if (!response.ok) {
+                    throw new Error(`Erro na API: ${response.status}`);
+                }
+                const data = await response.json();
+                btcPrices[currency] = data.bitcoin[currency.toLowerCase()];
+                updateLastUpdated();
+                return true;
+            } catch (error) {
+                if (retries > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    return await fetchBtcPrice(currency, retries - 1);
+                }
+                showError('Erro ao buscar preço: ' + error.message);
+                return false;
+            }
+        }
+
+        function updateLastUpdated() {
+            document.getElementById('last-updated').textContent = 
+                `Atualizado em: ${new Date().toLocaleString('pt-BR')}`;
+        }
+
+        function showError(message) {
+            const errorElement = document.getElementById('error');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+
+        function calculate() {
+            const amount = parseFloat(document.getElementById('amount').value);
+            const inputCurrency = document.getElementById('input-currency').value;
+            const outputCurrency = document.getElementById('output-currency').value;
+            const fee = parseFloat(document.getElementById('fee').value) || 0;
+
+            if (isNaN(amount) || amount < 0) {
+                showError('Por favor, insira um valor válido.');
+                return;
+            }
+
+            if (['BRL', 'USD', 'EUR'].includes(inputCurrency) && !btcPrices[inputCurrency]) {
+                showError('Aguardando atualização do preço...');
+                return;
+            }
+            if (['BRL', 'USD', 'EUR'].includes(outputCurrency) && !btcPrices[outputCurrency]) {
+                showError('Aguardando atualização do preço...');
+                return;
+            }
+
+            let btcValue, finalValue;
+
+            if (inputCurrency === 'BTC') {
+                btcValue = amount;
+            } else if (inputCurrency === 'sats') {
+                btcValue = amount / 100000000;
+            } else {
+                btcValue = amount / btcPrices[inputCurrency];
+            }
+
+            if (outputCurrency === 'BTC') {
+                finalValue = btcValue;
+            } else if (outputCurrency === 'sats') {
+                finalValue = btcValue * 100000000;
+            } else {
+                finalValue = btcValue * btcPrices[outputCurrency];
+            }
+
+            finalValue = finalValue * (1 + fee / 100);
+
+            displayResult(finalValue, outputCurrency);
+        }
+
+        function displayResult(value, currency) {
+            const resultElement = document.getElementById('result');
+            const resultValueElement = document.getElementById('result-value');
+            
+            resultElement.style.display = 'block';
+            
+            if (currency === 'BTC') {
+                resultValueElement.textContent = `${value.toFixed(8)} BTC`;
+            } else if (currency === 'sats') {
+                resultValueElement.textContent = `${value.toFixed(0)} sats`;
+            } else {
+                resultValueElement.textContent = `${value.toFixed(2)} ${currency}`;
+            }
+        }
+
+        async function updatePrices() {
+            const currencies = ['BRL', 'USD', 'EUR'];
+            for (const currency of currencies) {
+                await fetchBtcPrice(currency);
+            }
+            setTimeout(updatePrices, UPDATE_INTERVAL);
+        }
+
+        async function initialize() {
+            try {
+                await updatePrices();
+            } catch (error) {
+                console.error('Erro na inicialização:', error);
+                showError('Erro ao carregar dados. Recarregue a página.');
+            }
+        }
+
+        document.getElementById('amount').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                calculate();
+            }
+        });
+
+        document.getElementById('fee').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                calculate();
+            }
+        });
+
+        initialize();
+    </script>
+</body>
+</html>
