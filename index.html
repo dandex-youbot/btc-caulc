@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora Bitcoin | Vem Pra Dig</title>
+    <title>Calculadora Bitcoin</title>
     <style>
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -199,39 +199,81 @@
             <div class="result-value" id="result-value"></div>
             <div class="info-text" id="last-updated"></div>
         </div>
-    </div>
-
     <script>
-        // (O código JavaScript permanece exatamente o mesmo da versão anterior)
+        // 1. CONFIGURAÇÕES GLOBAIS
+        const API_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=';
+        const CACHE_TIME = 5 * 60 * 1000; // 5 minutos de cache
         let btcPrices = {};
-        const COINGECKO_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=';
-        const UPDATE_INTERVAL = 60000; // 60 segundos
+        let lastUpdate = {
+            time: null,
+            source: 'Nenhum dado carregado ainda'
+        };
 
-        async function fetchBtcPrice(currency, retries = 3) {
+        // 2. FUNÇÃO PARA BUSCAR PREÇOS
+        async function fetchBtcPrice(currency) {
             try {
-                const response = await fetch(`${COINGECKO_URL}${currency.toLowerCase()}`);
-                if (!response.ok) {
-                    throw new Error(`Erro na API: ${response.status}`);
+                // Verifica cache primeiro
+                const cached = localStorage.getItem(`btc_${currency}`);
+                if (cached) {
+                    const { price, timestamp, source } = JSON.parse(cached);
+                    if (Date.now() - timestamp < CACHE_TIME) {
+                        btcPrices[currency] = price;
+                        lastUpdate = {
+                            time: timestamp,
+                            source: `Fonte: ${source}`
+                        };
+                        updateStatus();
+                        return true;
+                    }
                 }
+
+                // Busca na API
+                const response = await fetch(`${API_URL}${currency.toLowerCase()}`);
+                
+                if (!response.ok) throw new Error(`Erro: ${response.status}`);
+                
                 const data = await response.json();
-                btcPrices[currency] = data.bitcoin[currency.toLowerCase()];
-                updateLastUpdated();
+                const price = data.bitcoin[currency.toLowerCase()];
+                
+                // Atualiza cache
+                localStorage.setItem(`btc_${currency}`, JSON.stringify({
+                    price,
+                    timestamp: Date.now(),
+                    source: 'CoinGecko'
+                }));
+                
+                btcPrices[currency] = price;
+                lastUpdate = {
+                    time: Date.now(),
+                    source: 'Fonte: CoinGecko'
+                };
+                
+                updateStatus();
                 return true;
+                
             } catch (error) {
-                if (retries > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    return await fetchBtcPrice(currency, retries - 1);
-                }
-                showError('Erro ao buscar preço: ' + error.message);
+                console.error(`Erro ao buscar ${currency}:`, error);
                 return false;
             }
         }
 
-        function updateLastUpdated() {
-            document.getElementById('last-updated').textContent = 
-                `Atualizado em: ${new Date().toLocaleString('pt-BR')}`;
+        // 3. ATUALIZA O STATUS
+        function updateStatus() {
+            const statusElement = document.getElementById('last-updated');
+            
+            if (!lastUpdate.time) {
+                statusElement.innerHTML = 'Aguardando primeira atualização...';
+                return;
+            }
+            
+            const date = new Date(lastUpdate.time);
+            statusElement.innerHTML = `
+                <div>Última atualização: ${date.toLocaleString('pt-BR')}</div>
+                <div>${lastUpdate.source}</div>
+            `;
         }
 
+        // 4. MOSTRA ERROS
         function showError(message) {
             const errorElement = document.getElementById('error');
             errorElement.textContent = message;
@@ -241,49 +283,67 @@
             }, 5000);
         }
 
-        function calculate() {
-            const amount = parseFloat(document.getElementById('amount').value);
+        // 5. FUNÇÃO PRINCIPAL DE CÁLCULO
+        async function calculate() {
+            // Validação básica
+            const amountInput = document.getElementById('amount');
+            const amount = parseFloat(amountInput.value);
+            
+            if (isNaN(amount)) {
+                showError('Por favor, digite um valor numérico válido');
+                amountInput.focus();
+                return;
+            }
+            
+            if (amount < 0) {
+                showError('O valor não pode ser negativo');
+                amountInput.focus();
+                return;
+            }
+
             const inputCurrency = document.getElementById('input-currency').value;
             const outputCurrency = document.getElementById('output-currency').value;
             const fee = parseFloat(document.getElementById('fee').value) || 0;
 
-            if (isNaN(amount) || amount < 0) {
-                showError('Por favor, insira um valor válido.');
-                return;
-            }
-
+            // Verifica disponibilidade dos preços
             if (['BRL', 'USD', 'EUR'].includes(inputCurrency) && !btcPrices[inputCurrency]) {
-                showError('Aguardando atualização do preço...');
+                showError(`Dados de ${inputCurrency} indisponíveis. Aguarde a atualização.`);
                 return;
             }
+
             if (['BRL', 'USD', 'EUR'].includes(outputCurrency) && !btcPrices[outputCurrency]) {
-                showError('Aguardando atualização do preço...');
+                showError(`Dados de ${outputCurrency} indisponíveis. Aguarde a atualização.`);
                 return;
             }
 
-            let btcValue, finalValue;
-
+            // Conversão para BTC
+            let btcAmount;
             if (inputCurrency === 'BTC') {
-                btcValue = amount;
+                btcAmount = amount;
             } else if (inputCurrency === 'sats') {
-                btcValue = amount / 100000000;
+                btcAmount = amount / 100000000;
             } else {
-                btcValue = amount / btcPrices[inputCurrency];
+                btcAmount = amount / btcPrices[inputCurrency];
             }
 
+            // Conversão para moeda de saída
+            let result;
             if (outputCurrency === 'BTC') {
-                finalValue = btcValue;
+                result = btcAmount;
             } else if (outputCurrency === 'sats') {
-                finalValue = btcValue * 100000000;
+                result = btcAmount * 100000000;
             } else {
-                finalValue = btcValue * btcPrices[outputCurrency];
+                result = btcAmount * btcPrices[outputCurrency];
             }
 
-            finalValue = finalValue * (1 + fee / 100);
+            // Aplica taxa
+            result = result * (1 + fee / 100);
 
-            displayResult(finalValue, outputCurrency);
+            // Exibe o resultado
+            displayResult(result, outputCurrency);
         }
 
+        // 6. EXIBE O RESULTADO
         function displayResult(value, currency) {
             const resultElement = document.getElementById('result');
             const resultValueElement = document.getElementById('result-value');
@@ -293,42 +353,66 @@
             if (currency === 'BTC') {
                 resultValueElement.textContent = `${value.toFixed(8)} BTC`;
             } else if (currency === 'sats') {
-                resultValueElement.textContent = `${value.toFixed(0)} sats`;
+                resultValueElement.textContent = `${Math.round(value)} sats`;
             } else {
-                resultValueElement.textContent = `${value.toFixed(2)} ${currency}`;
+                resultValueElement.textContent = value.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: currency
+                });
             }
         }
 
+        // 7. ATUALIZAÇÃO PERIÓDICA
         async function updatePrices() {
             const currencies = ['BRL', 'USD', 'EUR'];
+            let success = false;
+            
             for (const currency of currencies) {
-                await fetchBtcPrice(currency);
+                if (await fetchBtcPrice(currency)) {
+                    success = true;
+                }
             }
-            setTimeout(updatePrices, UPDATE_INTERVAL);
+            
+            if (!success && Object.keys(btcPrices).length === 0) {
+                showError('Não foi possível conectar à API. Dados podem estar desatualizados.');
+            }
+            
+            setTimeout(updatePrices, 60000); // Atualiza a cada 1 minuto
         }
 
-        async function initialize() {
-            try {
-                await updatePrices();
-            } catch (error) {
-                console.error('Erro na inicialização:', error);
-                showError('Erro ao carregar dados. Recarregue a página.');
-            }
+        // 8. INICIALIZAÇÃO
+        function init() {
+            // Carrega do cache ao iniciar
+            ['BRL', 'USD', 'EUR'].forEach(currency => {
+                const cached = localStorage.getItem(`btc_${currency}`);
+                if (cached) {
+                    const { price, timestamp, source } = JSON.parse(cached);
+                    btcPrices[currency] = price;
+                    lastUpdate = {
+                        time: timestamp,
+                        source: `Fonte: ${source}`
+                    };
+                }
+            });
+            
+            updateStatus();
+            updatePrices();
+            
+            // Event listeners
+            document.getElementById('amount').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') calculate();
+            });
+            
+            document.getElementById('fee').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') calculate();
+            });
+            
+            // Adiciona evento de clique ao botão (além do onclick no HTML)
+            document.querySelector('button').addEventListener('click', calculate);
         }
 
-        document.getElementById('amount').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                calculate();
-            }
-        });
-
-        document.getElementById('fee').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                calculate();
-            }
-        });
-
-        initialize();
+        // 9. INICIA QUANDO A PÁGINA CARREGAR
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
